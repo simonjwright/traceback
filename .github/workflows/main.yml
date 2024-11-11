@@ -9,7 +9,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        os: [ubuntu-latest, windows-latest, macos-13, macos-latest]
+        # macos-13 is x86_64, macos-latest is aarch64.
         
     runs-on: ${{ matrix.os }}
 
