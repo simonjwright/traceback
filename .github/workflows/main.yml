@@ -16,4 +16,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - uses: alire-project/setup-alire@v4
-      - run:  alr run --development
+      - run: |
+          alr build --development
+          alr run
+        
