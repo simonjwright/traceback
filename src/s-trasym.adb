@@ -58,40 +58,28 @@ package body System.Traceback.Symbolic is
               (C, Executable_Load_Address,
                "__gnat_get_executable_load_address");
 
-            function Trim_Hex (S : String) return String;
-            function Trim_Hex (S : String) return String is
-               Non_0 : Positive;
-            begin
-               for J in S'Range loop
-                  if S (J) /= '0' or else J = S'Last then
-                     Non_0 := J;
-                     exit;
-                  end if;
-               end loop;
-               return S (Non_0 .. S'Last);
-            end Trim_Hex;
-
             Load_Address : constant System.Address :=
               Executable_Load_Address;
             One_If_Executable_Is_PI : constant Natural :=
               Boolean'Pos (Load_Address /= Null_Address);
 
-            --  How long is an Address_Image?
-            Max_Image_Length : constant Natural :=
+            --  How long is an Address_Image? (hex digits only).
+            Image_Length : constant Natural :=
               System.Address_Image (Traceback (Traceback'First))'
                 Length;
 
             Load_Address_Prefix : constant String :=
               "Load address: ";
 
-            Max_Length_Needed : constant Positive :=
-              (Load_Address_Prefix'Length *
-               One_If_Executable_Is_PI) +
-              (Max_Image_Length + 3) *
-                (Traceback'Length + One_If_Executable_Is_PI) +
-              2;
+            --  For each address to be output, we need the preceding "%x"
+            --  and a trailing space, making 3 additional characters.
+            --  There are 2 additional LFs.
+            Length_Needed : constant Positive :=
+              (Load_Address_Prefix'Length * One_If_Executable_Is_PI) +
+              (Image_Length + 3) *
+              (Traceback'Length + One_If_Executable_Is_PI);
 
-            Result : String (1 .. Max_Length_Needed);
+            Result : String (1 .. Length_Needed);
 
             Last : Natural := 0;
 
@@ -99,28 +87,26 @@ package body System.Traceback.Symbolic is
 
             if One_If_Executable_Is_PI /= 0 then
                declare
-                  item : constant String :=
+                  Item : constant String :=
                     Load_Address_Prefix & "0x" &
-                    Trim_Hex
-                      (System.Address_Image (Load_Address)) &
+                    System.Address_Image (Load_Address) &
                     ASCII.LF;
                begin
-                  Last := item'Length;
-                  Result (1 .. Last) := item;
+                  Last := Item'Length;
+                  Result (1 .. Last) := Item;
                end;
             end if;
 
             for J in Traceback'Range loop
                declare
                   Img : constant String :=
-                    Trim_Hex
-                      (System.Address_Image (Traceback (J)));
+                    System.Address_Image (Traceback (J));
                begin
                   Result (Last + 1 .. Last + 2) := "0x";
                   Last := Last + 2;
                   Result (Last + 1 .. Last + Img'Length) := Img;
                   Last := Last + Img'Length + 1;
-                  Result (Last)                          := ' ';
+                  Result (Last) := ' ';
                end;
             end loop;
 
