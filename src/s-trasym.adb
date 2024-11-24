@@ -75,9 +75,11 @@ package body System.Traceback.Symbolic is
             --  and a trailing space, making 3 additional characters.
             --  There are 2 additional LFs.
             Length_Needed : constant Positive :=
-              (Load_Address_Prefix'Length * One_If_Executable_Is_PI) +
+              (Load_Address_Prefix'Length *
+               One_If_Executable_Is_PI) +
               (Image_Length + 3) *
-              (Traceback'Length + One_If_Executable_Is_PI);
+                (Traceback'Length + One_If_Executable_Is_PI) +
+              2;
 
             Result : String (1 .. Length_Needed);
 
