@@ -20,4 +20,8 @@ project Libgnat is
       for Body ("System.Mmap.OS_Interface") use "s-mmosin__unix.adb";
    end Naming;
 
+   package Pretty_Printer is
+      for Switches ("ada") use ("--source-line-breaks");
+   end Pretty_Printer;
+
 end Libgnat;

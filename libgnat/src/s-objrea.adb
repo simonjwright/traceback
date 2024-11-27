@@ -35,6 +35,8 @@ with Interfaces.C;
 
 with System.CRTL;
 
+with GNAT.IO;
+
 package body System.Object_Reader is
 
    use Interfaces;
@@ -501,6 +503,64 @@ package body System.Object_Reader is
       --  Fetch a section by index from zero
 
    end XCOFF32_Ops;
+
+   -----------------------------------
+   -- MACH_O object format handling --
+   -----------------------------------
+
+   package MACH_O_Ops is
+
+      MH_MAGIC_64 : constant := 16#feed_facf#;
+
+      type mach_header_64 is record
+         magic      : aliased uint32;
+         cputype    : aliased int32;
+         cpusubtype : aliased int32;
+         filetype   : aliased uint32;
+         ncmds      : aliased uint32;
+         sizeofcmds : aliased uint32;
+         flags      : aliased uint32;
+         reserved   : aliased uint32;
+      end record with
+        Convention => C_Pass_By_Copy;
+
+      subtype Header is mach_header_64;
+
+      function Read_Header (F : in out Mapped_Stream) return Header;
+      --  Read the object file header
+
+      function First_Symbol
+        (Obj : in out MACH_O_Object_File) return Object_Symbol;
+      --  Return the first element in the symbol table, or Null_Symbol if the
+      --  symbol table is empty.
+
+      function Read_Symbol
+        (Obj : in out MACH_O_Object_File;
+         Off : Offset) return Object_Symbol;
+      --  Read a symbol at offset Off
+
+      function Name
+        (Obj : in out MACH_O_Object_File;
+         Sym : Object_Symbol) return String_Ptr_Len;
+      --  Return the name of the symbol
+
+      function Name
+        (Obj : in out MACH_O_Object_File;
+         Sec : Object_Section) return String;
+      --  Return the name of a section
+
+      function Initialize
+        (F            : Mapped_File;
+         Hdr          : Header;
+         In_Exception : Boolean) return MACH_O_Object_File;
+      --  Initialize an object file
+
+      function Get_Section
+          (Obj   : in out MACH_O_Object_File;
+           Index : uint32) return Object_Section;
+      --  Fetch a section by index from zero
+
+   end MACH_O_Ops;
 
    -------------
    -- ELF_Ops --
@@ -1505,6 +1565,176 @@ package body System.Object_Reader is
       end Name;
    end XCOFF32_Ops;
 
+   ----------------
+   -- MACH_O_Ops --
+   ----------------
+
+   package body MACH_O_Ops is
+
+      --  At the beginning of every Mach-O file is a header structure
+      --  that identifies the file as a Mach-O file. The header also
+      --  contains other basic file type information, indicates the
+      --  target architecture, and contains flags specifying options
+      --  that affect the interpretation of the rest of the file.
+
+      --  Directly following the header are a series of variable-size
+      --  load commands that specify the layout and linkage
+      --  characteristics of the file. Among other information, the
+      --  load commands can specify:
+      --  * The initial layout of the file in virtual memory
+      --  * The location of the symbol table (used for dynamic linking)
+      --  * The initial execution state of the main thread of the program
+      --  * The names of shared libraries that contain definitions
+      --    for the main executable’s imported symbols
+
+      --  Following the load commands, all Mach-O files contain the
+      --  data of one or more segments. Each segment contains zero or
+      --  more sections. Each section of a segment contains code or
+      --  data of some particular type. Each segment defines a region
+      --  of virtual memory that the dynamic linker maps into the
+      --  address space of the process. The exact number and layout of
+      --  segments and sections is specified by the load commands and
+      --  the file type.
+
+      --  In user-level fully linked Mach-O files, the last segment is
+      --  the link edit segment. This segment contains the tables of
+      --  link edit information, such as the symbol table, string
+      --  table, and so forth, used by the dynamic loader to link an
+      --  executable file or Mach-O bundle to its dependent libraries.
+
+      --  Various tables within a Mach-O file refer to sections by
+      --  number. Section numbering begins at 1 (not 0) and continues
+      --  across segment boundaries. Thus, the first segment in a file
+      --  may contain sections 1 and 2 and the second segment may
+      --  contain sections 3 and 4.
+
+      --  When using the Stabs debugging format, the symbol table also
+      --  holds debugging information. When using DWARF, debugging
+      --  information is stored in the image’s corresponding dSYM
+      --  file, specified by the uuid_command structure.
+
+      --  MH_MAGIC_64 : constant := 16#feed_facf#;
+
+      --  type mach_header_64 is record
+      --     magic      : aliased uint32;
+      --     cputype    : aliased int32;
+      --     cpusubtype : aliased int32;
+      --     filetype   : aliased uint32;
+      --     ncmds      : aliased uint32;
+      --     sizeofcmds : aliased uint32;
+      --     flags      : aliased uint32;
+      --     reserved   : aliased uint32;
+      --  end record with
+      --    Convention => C_Pass_By_Copy;
+
+      type load_command is record
+         cmd     : aliased uint32;
+         cmdsize : aliased uint32;
+      end record with
+        Convention => C_Pass_By_Copy;
+
+      type lc_str (discr : unsigned := 0) is record
+         case discr is
+            when others =>
+               offset : aliased uint32;
+         end case;
+      end record with
+        Convention => C_Pass_By_Copy, Unchecked_Union => True;
+
+      --  More load commands below.
+
+      subtype anon_array1770 is Interfaces.C.char_array (0 .. 15);
+
+      type segment_command_64 is record
+         cmd      : aliased uint32;
+         cmdsize  : aliased uint32;
+         segname  : aliased anon_array1770;
+         vmaddr   : aliased uint64;
+         vmsize   : aliased uint64;
+         fileoff  : aliased uint64;
+         filesize : aliased uint64;
+         maxprot  : aliased int32;
+         initprot : aliased int32;
+         nsects   : aliased uint32;
+         flags    : aliased uint32;
+      end record with
+        Convention => C_Pass_By_Copy;
+
+      type section_64 is record
+         sectname  : aliased anon_array1770;
+         segname   : aliased anon_array1770;
+         addr      : aliased uint64;
+         size      : aliased uint64;
+         offset    : aliased uint32;
+         align     : aliased uint32;
+         reloff    : aliased uint32;
+         nreloc    : aliased uint32;
+         flags     : aliased uint32;
+         reserved1 : aliased uint32;
+         reserved2 : aliased uint32;
+         reserved3 : aliased uint32;
+      end record with
+        Convention => C_Pass_By_Copy;
+
+      Unimplemented : exception;
+
+      function Read_Header (F : in out Mapped_Stream) return Header is
+         Hdr : Header;
+      begin
+         Seek (F, 0);
+         Read_Raw (F, Hdr'Address, uint32 (Hdr'Size / SSU));
+         GNAT.IO.Put_Line (Hdr'Image);
+         return Hdr;
+      end Read_Header;
+
+      function First_Symbol
+        (Obj : in out MACH_O_Object_File) return Object_Symbol is
+        (raise Unimplemented);
+
+      function Read_Symbol
+        (Obj : in out MACH_O_Object_File; Off : Offset)
+         return Object_Symbol is
+        (raise Unimplemented);
+
+      function Name
+        (Obj : in out MACH_O_Object_File; Sym : Object_Symbol)
+         return String_Ptr_Len is
+        (raise Unimplemented);
+
+      function Name
+        (Obj : in out MACH_O_Object_File; Sec : Object_Section)
+         return String is
+        (raise Unimplemented);
+
+      function Initialize
+        (F : Mapped_File; Hdr : Header; In_Exception : Boolean)
+         return MACH_O_Object_File
+      is
+         Command_Stream : Mapped_Stream :=
+           Create_Stream
+             (MF          => F, File_Offset => Hdr'Size / SSU,
+              File_Length => File_Size (Hdr.sizeofcmds));
+         Location       : int64;
+         Cmd            : load_command;
+      begin
+         Location := Tell (Command_Stream);
+         for c in 1 .. Hdr.ncmds loop
+            Seek (Command_Stream, Location);
+            Read_Raw
+              (Command_Stream, Cmd'Address, uint32 (Cmd'Size / SSU));
+            GNAT.IO.Put_Line ("lc " & Cmd.cmd'Image);
+            Location := Location + int64 (Cmd.cmdsize);
+         end loop;
+         return raise Unimplemented;
+      end Initialize;
+
+      function Get_Section
+        (Obj : in out MACH_O_Object_File; Index : uint32)
+         return Object_Section is
+        (raise Unimplemented);
+
+   end MACH_O_Ops;
+
    ----------
    -- Arch --
    ----------
@@ -1565,7 +1795,7 @@ package body System.Object_Reader is
       Close (Obj.Sectab_Stream);
 
       case Obj.Format is
-         when ELF =>
+         when ELF | MACH_O =>
             Close (Obj.Secstr_Stream);
          when Any_PECOFF =>
             null;
@@ -1638,6 +1868,7 @@ package body System.Object_Reader is
          when ELF64      => return ELF64_Ops.First_Symbol   (Obj);
          when Any_PECOFF => return PECOFF_Ops.First_Symbol  (Obj);
          when XCOFF32    => return XCOFF32_Ops.First_Symbol (Obj);
+         when MACH_O     => return MACH_O_Ops.First_Symbol  (Obj);
       end case;
    end First_Symbol;
 
@@ -1660,6 +1891,7 @@ package body System.Object_Reader is
          when ELF        => return 0;
          when Any_PECOFF => return Obj.ImageBase;
          when XCOFF32    => raise Format_Error;
+         when MACH_O     => return Obj.ImageBase;
       end case;
    end Get_Load_Address;
 
@@ -1677,6 +1909,7 @@ package body System.Object_Reader is
          when ELF64      => return ELF64_Ops.Get_Section   (Obj, Shnum);
          when Any_PECOFF => return PECOFF_Ops.Get_Section  (Obj, Shnum);
          when XCOFF32    => return XCOFF32_Ops.Get_Section (Obj, Shnum);
+         when MACH_O     => return MACH_O_Ops.Get_Section  (Obj, Shnum);
       end case;
    end Get_Section;
 
@@ -1746,6 +1979,7 @@ package body System.Object_Reader is
          when ELF64      => return ELF64_Ops.Name   (Obj, Sec);
          when Any_PECOFF => return PECOFF_Ops.Name  (Obj, Sec);
          when XCOFF32    => return XCOFF32_Ops.Name (Obj, Sec);
+         when MACH_O     => return MACH_O_Ops.Name  (Obj, Sec);
       end case;
    end Name;
 
@@ -1759,6 +1993,7 @@ package body System.Object_Reader is
          when ELF64      => return ELF64_Ops.Name   (Obj, Sym);
          when Any_PECOFF => return PECOFF_Ops.Name  (Obj, Sym);
          when XCOFF32    => return XCOFF32_Ops.Name (Obj, Sym);
+         when MACH_O     => return MACH_O_Ops.Name  (Obj, Sym);
       end case;
    end Name;
 
@@ -1927,6 +2162,20 @@ package body System.Object_Reader is
             Close (Hdr_Stream);
             return new Object_File'
                          (XCOFF32_Ops.Initialize (F, Hdr, In_Exception));
+         end if;
+      end;
+
+      declare
+         Hdr : constant MACH_O_Ops.Header :=
+           MACH_O_Ops.Read_Header (Hdr_Stream);
+
+      begin
+         --  Test the magic numbers
+
+         if Hdr.magic = MACH_O_Ops.MH_MAGIC_64 then
+            Close (Hdr_Stream);
+            return new Object_File'
+                         (MACH_O_Ops.Initialize (F, Hdr, In_Exception));
          end if;
       end;
 
@@ -2177,6 +2426,7 @@ package body System.Object_Reader is
          when ELF64      => return ELF64_Ops.Read_Symbol   (Obj, Off);
          when Any_PECOFF => return PECOFF_Ops.Read_Symbol  (Obj, Off);
          when XCOFF32    => return XCOFF32_Ops.Read_Symbol (Obj, Off);
+         when MACH_O     => return MACH_O_Ops.Read_Symbol  (Obj, Off);
       end case;
    end Read_Symbol;
 

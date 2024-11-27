@@ -63,19 +63,22 @@ package System.Object_Reader is
 
    type Object_Format is
      (ELF32,
-      --  Object format is 32-bit ELF
+   --  Object format is 32-bit ELF
 
       ELF64,
-      --  Object format is 64-bit ELF
+   --  Object format is 64-bit ELF
 
       PECOFF,
-      --  Object format is Microsoft PECOFF
+   --  Object format is Microsoft PECOFF
 
       PECOFF_PLUS,
-      --  Object format is Microsoft PECOFF+
+   --  Object format is Microsoft PECOFF+
 
-      XCOFF32);
-      --  Object format is AIX 32-bit XCOFF
+      XCOFF32,
+   --  Object format is AIX 32-bit XCOFF
+
+      MACH_O);
+   --  Object format is Darwin 64-bit Mach-O (no 32-bit targets supported)
 
    --  PECOFF | PECOFF_PLUS appears so often as a case choice, would
    --  seem a good idea to have a subtype name covering these two choices ???
@@ -402,7 +405,7 @@ private
       --  Symbol strings
 
       case Format is
-         when ELF =>
+         when ELF | MACH_O =>
             Secstr_Stream : Mapped_Stream;
             --  Section strings
 
@@ -427,6 +430,9 @@ private
 
    subtype XCOFF32_Object_File is Object_File
      with Predicate => XCOFF32_Object_File.Format in XCOFF32;
+
+   subtype MACH_O_Object_File is Object_File
+     with Predicate => MACH_O_Object_File.Format in MACH_O;
 
    type Object_Section is record
       Num        : uint32 := 0;

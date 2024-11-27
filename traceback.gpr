@@ -21,4 +21,8 @@ project Traceback is
       for Switches ("other") use ("g");
    end Linker;
 
+   package Pretty_Printer is
+      for Switches ("ada") use ("--source-line-breaks");
+   end Pretty_Printer;
+
 end Traceback;
