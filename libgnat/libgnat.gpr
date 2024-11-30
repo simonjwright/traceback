@@ -1,0 +1,27 @@
+project Libgnat is
+
+   for Library_Name use "libgnat";
+
+   for Source_Dirs use ("src/");
+   for Object_Dir use "obj/";
+   for Create_Missing_Dirs use "True";
+   for Library_Dir use "lib";
+   for Library_Kind use "static";
+
+   package Compiler is
+      for Local_Configuration_Pragmas use "warnings_off.adc";
+      for Default_Switches ("Ada") use ("-g", "-gnatpg");
+   end Compiler;
+
+   package Naming is
+      for Body ("System.Traceback.Symbolic") use "s-trasym__dwarf.adb";
+      for Spec ("System.Mmap.Unix") use "s-mmauni__long.ads";
+      for Spec ("System.Mmap.OS_Interface") use "s-mmosin__unix.ads";
+      for Body ("System.Mmap.OS_Interface") use "s-mmosin__unix.adb";
+   end Naming;
+
+   package Pretty_Printer is
+      for Switches ("ada") use ("--source-line-breaks");
+   end Pretty_Printer;
+
+end Libgnat;
