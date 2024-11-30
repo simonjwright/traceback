@@ -510,13 +510,16 @@ package body System.Object_Reader is
 
    package MACH_O_Ops is
 
+      pragma Warnings (Off, "is not referenced");
+
       MH_MAGIC_64 : constant := 16#feed_facf#;
+      MH_EXECUTE  : constant := 16#2#;
 
       type mach_header_64 is record
          magic      : aliased uint32;
          cputype    : aliased int32;
          cpusubtype : aliased int32;
-         filetype   : aliased uint32;
+         filetype   : aliased uint32;  -- executable if MH_EXECUTE.
          ncmds      : aliased uint32;
          sizeofcmds : aliased uint32;
          flags      : aliased uint32;
@@ -536,17 +539,17 @@ package body System.Object_Reader is
 
       function Read_Symbol
         (Obj : in out MACH_O_Object_File;
-         Off : Offset) return Object_Symbol;
+         Off :        Offset) return Object_Symbol;
       --  Read a symbol at offset Off
 
       function Name
         (Obj : in out MACH_O_Object_File;
-         Sym : Object_Symbol) return String_Ptr_Len;
+         Sym :        Object_Symbol) return String_Ptr_Len;
       --  Return the name of the symbol
 
       function Name
         (Obj : in out MACH_O_Object_File;
-         Sec : Object_Section) return String;
+         Sec :        Object_Section) return String;
       --  Return the name of a section
 
       function Initialize
@@ -556,9 +559,11 @@ package body System.Object_Reader is
       --  Initialize an object file
 
       function Get_Section
-          (Obj   : in out MACH_O_Object_File;
-           Index : uint32) return Object_Section;
-      --  Fetch a section by index from zero
+        (Obj   : in out MACH_O_Object_File;
+         Index :        uint32) return Object_Section;
+   --  Fetch a section by index from zero
+
+      pragma Warnings (On, "is not referenced");
 
    end MACH_O_Ops;
 
@@ -1571,6 +1576,8 @@ package body System.Object_Reader is
 
    package body MACH_O_Ops is
 
+      pragma Warnings (Off, "is not referenced");
+
       --  At the beginning of every Mach-O file is a header structure
       --  that identifies the file as a Mach-O file. The header also
       --  contains other basic file type information, indicates the
@@ -1627,11 +1634,132 @@ package body System.Object_Reader is
       --  end record with
       --    Convention => C_Pass_By_Copy;
 
+      type load_command_kind is
+        (LC_SEGMENT,
+         LC_SYMTAB,
+         LC_SYMSEG,
+         LC_THREAD,
+         LC_UNIXTHREAD,
+         LC_LOADFVMLIB,
+         LC_IDFVMLIB,
+         LC_IDENT,
+         LC_FVMFILE,
+         LC_PREPAGE,
+         LC_DYSYMTAB,
+         LC_LOAD_DYLIB,
+         LC_ID_DYLIB,
+         LC_LOAD_DYLINKER,
+         LC_ID_DYLINKER,
+         LC_PREBOUND_DYLIB,
+         LC_ROUTINES,
+         LC_SUB_FRAMEWORK,
+         LC_SUB_UMBRELLA,
+         LC_SUB_CLIENT,
+         LC_SUB_LIBRARY,
+         LC_TWOLEVEL_HINTS,
+         LC_PREBIND_CKSUM,
+         LC_LOAD_WEAK_DYLIB_x,
+         LC_SEGMENT_64,
+         LC_ROUTINES_64,
+         LC_UUID,
+         LC_RPATH_x,
+         LC_CODE_SIGNATURE,
+         LC_SEGMENT_SPLIT_INFO,
+         LC_REEXPORT_DYLIB_x,
+         LC_LAZY_LOAD_DYLIB,
+         LC_ENCRYPTION_INFO,
+         LC_DYLD_INFO,
+         --  LC_DYLD_INFO_ONLY_x,
+         LC_LOAD_UPWARD_DYLIB_x,
+         LC_VERSION_MIN_MACOSX,
+         LC_VERSION_MIN_IPHONEOS,
+         LC_FUNCTION_STARTS,
+         LC_DYLD_ENVIRONMENT,
+         LC_MAIN_x,
+         LC_DATA_IN_CODE,
+         LC_SOURCE_VERSION,
+         LC_DYLIB_CODE_SIGN_DRS,
+         LC_ENCRYPTION_INFO_64,
+         LC_LINKER_OPTION,
+         LC_LINKER_OPTIMIZATION_HINT,
+         LC_VERSION_MIN_TVOS,
+         LC_VERSION_MIN_WATCHOS,
+         LC_NOTE,
+         LC_BUILD_VERSION,
+         LC_DYLD_EXPORTS_TRIE_x,
+         LC_DYLD_CHAINED_FIXUPS_x,
+         LC_FILESET_ENTRY_x,
+         LC_ATOM_INFO
+         );
+
+      for load_command_kind use
+        (LC_SEGMENT                  => 16#1#,
+         LC_SYMTAB                   => 16#2#,
+         LC_SYMSEG                   => 16#3#,
+         LC_THREAD                   => 16#4#,
+         LC_UNIXTHREAD               => 16#5#,
+         LC_LOADFVMLIB               => 16#6#,
+         LC_IDFVMLIB                 => 16#7#,
+         LC_IDENT                    => 16#8#,
+         LC_FVMFILE                  => 16#9#,
+         LC_PREPAGE                  => 16#a#,
+         LC_DYSYMTAB                 => 16#b#,
+         LC_LOAD_DYLIB               => 16#c#,
+         LC_ID_DYLIB                 => 16#d#,
+         LC_LOAD_DYLINKER            => 16#e#,
+         LC_ID_DYLINKER              => 16#f#,
+         LC_PREBOUND_DYLIB           => 16#10#,
+         LC_ROUTINES                 => 16#11#,
+         LC_SUB_FRAMEWORK            => 16#12#,
+         LC_SUB_UMBRELLA             => 16#13#,
+         LC_SUB_CLIENT               => 16#14#,
+         LC_SUB_LIBRARY              => 16#15#,
+         LC_TWOLEVEL_HINTS           => 16#16#,
+         LC_PREBIND_CKSUM            => 16#17#,
+         LC_LOAD_WEAK_DYLIB_x        => 16#18#,
+         LC_SEGMENT_64               => 16#19#,
+         LC_ROUTINES_64              => 16#1a#,
+         LC_UUID                     => 16#1b#,
+         LC_RPATH_x                  => 16#1c#,
+         LC_CODE_SIGNATURE           => 16#1d#,
+         LC_SEGMENT_SPLIT_INFO       => 16#1e#,
+         LC_REEXPORT_DYLIB_x         => 16#1f#,
+         LC_LAZY_LOAD_DYLIB          => 16#20#,
+         LC_ENCRYPTION_INFO          => 16#21#,
+         LC_DYLD_INFO                => 16#22#,
+         LC_LOAD_UPWARD_DYLIB_x      => 16#23#,
+         LC_VERSION_MIN_MACOSX       => 16#24#,
+         LC_VERSION_MIN_IPHONEOS     => 16#25#,
+         LC_FUNCTION_STARTS          => 16#26#,
+         LC_DYLD_ENVIRONMENT         => 16#27#,
+         LC_MAIN_x                   => 16#28#,
+         LC_DATA_IN_CODE             => 16#29#,
+         LC_SOURCE_VERSION           => 16#2A#,
+         LC_DYLIB_CODE_SIGN_DRS      => 16#2B#,
+         LC_ENCRYPTION_INFO_64       => 16#2C#,
+         LC_LINKER_OPTION            => 16#2D#,
+         LC_LINKER_OPTIMIZATION_HINT => 16#2E#,
+         LC_VERSION_MIN_TVOS         => 16#2F#,
+         LC_VERSION_MIN_WATCHOS      => 16#30#,
+         LC_NOTE                     => 16#31#,
+         LC_BUILD_VERSION            => 16#32#,
+         LC_DYLD_EXPORTS_TRIE_x      => 16#33#,
+         LC_DYLD_CHAINED_FIXUPS_x    => 16#34#,
+         LC_FILESET_ENTRY_x          => 16#35#,
+         LC_ATOM_INFO                => 16#36#
+         );
+
       type load_command is record
-         cmd     : aliased uint32;
-         cmdsize : aliased uint32;
+         dyld_must_recognise : Boolean;
+         cmd                 : load_command_kind;
+         cmdsize             : aliased uint32;
       end record with
         Convention => C_Pass_By_Copy;
+      for load_command use record
+         dyld_must_recognise at 0 range 31 .. 31;
+         cmd                 at 0 range  0 .. 30;
+         cmdsize             at 4 range  0 .. 31;
+      end record;
 
       type lc_str (discr : unsigned := 0) is record
          case discr is
@@ -1720,9 +1848,25 @@ package body System.Object_Reader is
          Location := Tell (Command_Stream);
          for c in 1 .. Hdr.ncmds loop
             Seek (Command_Stream, Location);
+            --  Read the common header
             Read_Raw
               (Command_Stream, Cmd'Address, uint32 (Cmd'Size / SSU));
             GNAT.IO.Put_Line ("lc " & Cmd.cmd'Image);
+            --  Go back to the start of the command
+            Seek (Command_Stream, Location);
+            case Cmd.cmd is
+               when LC_SEGMENT_64 =>
+                  declare
+                     cmd : segment_command_64;
+                  begin
+                     Read_Raw
+                       (Command_Stream, cmd'Address, uint32 (cmd'Size / SSU));
+                     GNAT.IO.Put_Line (cmd'Image);
+                     GNAT.IO.New_Line;
+                  end;
+               when others =>
+                  null;
+            end case;
             Location := Location + int64 (Cmd.cmdsize);
          end loop;
          return raise Unimplemented;
@@ -1732,6 +1876,8 @@ package body System.Object_Reader is
         (Obj : in out MACH_O_Object_File; Index : uint32)
          return Object_Section is
         (raise Unimplemented);
+
+      pragma Warnings (On, "is not referenced");
 
    end MACH_O_Ops;
 
