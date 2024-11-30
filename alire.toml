@@ -11,6 +11,8 @@ tags = []
 
 executables = ["traceback"]
 
-[[actions]]
-type = "pre-build"
-command = ["gprbuild", "-P", "traceback", "-c", "s-trasym.adb"]
+[[depends-on]]
+libgnat = "*"
+
+[[pins]]
+libgnat = {path = "libgnat"}

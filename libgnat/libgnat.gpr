@@ -13,13 +13,6 @@ project Libgnat is
       for Default_Switches ("Ada") use ("-g", "-gnatpg");
    end Compiler;
 
-   package Naming is
-      for Body ("System.Traceback.Symbolic") use "s-trasym__dwarf.adb";
-      for Spec ("System.Mmap.Unix") use "s-mmauni__long.ads";
-      for Spec ("System.Mmap.OS_Interface") use "s-mmosin__unix.ads";
-      for Body ("System.Mmap.OS_Interface") use "s-mmosin__unix.adb";
-   end Naming;
-
    package Pretty_Printer is
       for Switches ("ada") use ("--source-line-breaks");
    end Pretty_Printer;
