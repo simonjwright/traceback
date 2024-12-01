@@ -5,7 +5,7 @@ project Traceback is
    for Object_Dir use "obj/" & Traceback_Config.Build_Profile;
    for Create_Missing_Dirs use "True";
    for Exec_Dir use "bin";
-   for Main use ("traceback.adb");
+   for Main use ("traceback.adb", "object_reader.adb");
 
    package Compiler is
       for Default_Switches ("Ada") use Traceback_Config.Ada_Compiler_Switches;
