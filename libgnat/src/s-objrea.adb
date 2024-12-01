@@ -1788,6 +1788,7 @@ package body System.Object_Reader is
       end record with
         Convention => C_Pass_By_Copy;
 
+      --  These follow after a segment_64_command
       type section_64 is record
          sectname  : aliased anon_array1770;
          segname   : aliased anon_array1770;
@@ -1804,6 +1805,37 @@ package body System.Object_Reader is
       end record with
         Convention => C_Pass_By_Copy;
 
+      type symtab_command is record
+         cmd     : aliased uint32;
+         cmdsize : aliased uint32;
+         symoff  : aliased uint32;
+         nsyms   : aliased uint32;
+         stroff  : aliased uint32;
+         strsize : aliased uint32;
+      end record
+      with Convention => C_Pass_By_Copy;
+
+      --  nlist_64 items: referenced in symtab_command (but separate,
+      --  unlike section_64 items)
+
+      type anon_anon_2 (discr : unsigned := 0) is record
+         case discr is
+            when others =>
+               n_strx : aliased uint32;
+         end case;
+      end record
+      with Convention   => C_Pass_By_Copy,
+        Unchecked_Union => True;
+
+      type nlist_64 is record
+         n_un    : aliased anon_anon_2;
+         n_type  : aliased uint8;
+         n_sect  : aliased uint8;
+         n_desc  : aliased uint16;
+         n_value : aliased uint64;
+      end record
+      with Convention => C_Pass_By_Copy;
+
       Unimplemented : exception;
 
       function Read_Header (F : in out Mapped_Stream) return Header is
@@ -1812,6 +1844,7 @@ package body System.Object_Reader is
          Seek (F, 0);
          Read_Raw (F, Hdr'Address, uint32 (Hdr'Size / SSU));
          GNAT.IO.Put_Line (Hdr'Image);
+         GNAT.IO.New_Line;
          return Hdr;
       end Read_Header;
 
@@ -1840,8 +1873,9 @@ package body System.Object_Reader is
       is
          Command_Stream : Mapped_Stream :=
            Create_Stream
-             (MF          => F, File_Offset => Hdr'Size / SSU,
-              File_Length => File_Size (Hdr.sizeofcmds));
+             (MF          => F,
+              File_Offset => Hdr'Size / SSU,
+              File_Length => Length (F));
          Location       : int64;
          Cmd            : load_command;
       begin
@@ -1863,6 +1897,46 @@ package body System.Object_Reader is
                        (Command_Stream, cmd'Address, uint32 (cmd'Size / SSU));
                      GNAT.IO.Put_Line (cmd'Image);
                      GNAT.IO.New_Line;
+                     for j in 1 .. cmd.nsects loop
+                        declare
+                           sec : section_64;
+                        begin
+                           Read_Raw
+                             (Command_Stream,
+                              sec'Address,
+                              uint32 (sec'Size / SSU));
+                           GNAT.IO.Put_Line ("section" & j'Image);
+                           GNAT.IO.Put_Line (sec'Image);
+                           GNAT.IO.New_Line;
+                        end;
+                     end loop;
+                  end;
+               when LC_SYMTAB =>
+                  declare
+                     cmd : symtab_command;
+                  begin
+                     Read_Raw
+                       (Command_Stream, cmd'Address, uint32 (cmd'Size / SSU));
+                     GNAT.IO.Put_Line (cmd'Image);
+                     GNAT.IO.New_Line;
+                     Seek (Command_Stream, Offset (cmd.symoff));
+                     for j in 1 .. Integer'Min (5, Integer (cmd.nsyms)) loop
+                        declare
+                           sym : nlist_64;
+                        begin
+                           Read_Raw
+                             (Command_Stream,
+                              sym'Address,
+                              uint32 (sym'Size / SSU));
+                           GNAT.IO.Put_Line
+                             ("sym" &
+                              j'Image &
+                              ", idx" &
+                              sym.n_un.n_strx'Image);
+                           GNAT.IO.Put_Line (sym'Image);
+                           GNAT.IO.New_Line;
+                        end;
+                     end loop;
                   end;
                when others =>
                   null;

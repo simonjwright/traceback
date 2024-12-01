@@ -1,23 +1,28 @@
 all:
 	echo "be specific!"
 
-raw:
-	mkdir raw
-	(cd raw;							\
+raw: Makefile
+	rm -rf $@
+	mkdir $@
+	(cd $@;								\
 	 g++								\
 	   -c								\
 	   -fdump-ada-spec-slim						\
-	   $(shell xcrun --show-sdk-path)/usr/include/mach-o/loader.h)
+	   $(shell xcrun --show-sdk-path)/usr/include/mach-o/loader.h;	\
+	 g++								\
+	   -c								\
+	   -fdump-ada-spec-slim						\
+	   $(shell xcrun --show-sdk-path)/usr/include/mach-o/nlist.h)
 
 # These conversions (a) remove the package names derived from the
-# Darwin headers, (b) use the type names defined in s-objread.ads
+# Darwin headers, (b) use the type names defined in s-objrea.ads
 # (System.Object_Reader).
 #
 # There are still some Interfaces.C & Interfaces.C.Extended types.
 src: raw Makefile
 	rm -rf $@
 	mkdir -p $@
-	(cd raw;						\
+	(cd $<	;						\
 	  for f in *; do					\
 	   sed							\
 	     -e "s/^with utypes/--  &/g"			\
