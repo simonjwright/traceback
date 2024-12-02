@@ -1923,18 +1923,31 @@ package body System.Object_Reader is
                      for j in 1 .. Integer'Min (5, Integer (cmd.nsyms)) loop
                         declare
                            sym : nlist_64;
+                           str_offset : uint32;
+                           continuation : Offset;
                         begin
                            Read_Raw
                              (Command_Stream,
                               sym'Address,
                               uint32 (sym'Size / SSU));
-                           GNAT.IO.Put_Line
+                           GNAT.IO.Put
                              ("sym" &
-                              j'Image &
-                              ", idx" &
-                              sym.n_un.n_strx'Image);
+                              j'Image);
+                           str_offset := sym.n_un.n_strx;
+                           GNAT.IO.Put_Line (", idx" & str_offset'Image);
                            GNAT.IO.Put_Line (sym'Image);
+                           --  Remember where we'd got to, so we can
+                           --  read the next symbol.
+                           continuation := Tell (Command_Stream);
+
+                           GNAT.IO.Put_Line
+                             (Offset_To_String
+                                (Command_Stream,
+                                  Offset (cmd.stroff + str_offset)));
                            GNAT.IO.New_Line;
+
+                           --  Ready for the next symbol.
+                           Seek (Command_Stream, continuation);
                         end;
                      end loop;
                   end;
