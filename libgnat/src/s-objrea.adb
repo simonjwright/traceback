@@ -1874,12 +1874,17 @@ package body System.Object_Reader is
          Command_Stream : Mapped_Stream :=
            Create_Stream
              (MF          => F,
-              File_Offset => Hdr'Size / SSU,
+              File_Offset => 0,
               File_Length => Length (F));
+         unused_hdr     : Header;
          Location       : int64;
          Cmd            : load_command;
       begin
-         Location := Tell (Command_Stream);
+         --  Read the header again, so that Command_Stream started at
+         --  the beginning of the executable file, but is positioned
+         --  after the header.
+         unused_hdr := Read_Header (Command_Stream);
+         Location   := Tell (Command_Stream);
          for c in 1 .. Hdr.ncmds loop
             Seek (Command_Stream, Location);
             --  Read the common header
@@ -1922,8 +1927,8 @@ package body System.Object_Reader is
                      Seek (Command_Stream, Offset (cmd.symoff));
                      for j in 1 .. Integer'Min (5, Integer (cmd.nsyms)) loop
                         declare
-                           sym : nlist_64;
-                           str_offset : uint32;
+                           sym          : nlist_64;
+                           str_offset   : uint32;
                            continuation : Offset;
                         begin
                            Read_Raw
